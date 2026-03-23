@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Family Tree Data Manager</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      display: flex;
+      gap: 20px;
+      padding: 20px;
+      background: #f7f7f7;
+    }
+    #editor {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+    textarea {
+      width: 100%;
+      height: 600px;
+      font-family: monospace;
+      font-size: 14px;
+      padding: 10px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+    }
+    #preview {
+      flex: 1;
+      background: white;
+      padding: 20px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+    }
+    button {
+      margin-top: 10px;
+      padding: 10px;
+      border: none;
+      background: steelblue;
+      color: white;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    button:hover { background: #1f5f9f; }
+    .node circle {
+      fill: #fff;
+      stroke: steelblue;
+      stroke-width: 2px;
+    }
+    .node text {
+      font-size: 12px;
+    }
+    .link {
+      fill: none;
+      stroke: #ccc;
+      stroke-width: 2px;
+    }
+  </style>
+</head>
+<body>
+
+<div id="editor">
+  <h2>Family JSON Editor</h2>
+
+  <input type="file" id="fileInput" accept=".json">
+  <textarea id="jsonInput" placeholder="Load or paste your JSON here"></textarea>
+
+  <button id="validateBtn">Validate JSON</button>
+  <button id="previewBtn">Preview Tree</button>
+  <button id="downloadBtn">Download JSON</button>
+
+  <p id="status"></p>
+</div>
+
+<div id="preview">
+  <h2>Tree Preview</h2>
+  <svg id="tree" width="500" height="700"></svg>
+</div>
+
+<script>
+  const fileInput = document.getElementById("fileInput");
+  const jsonInput = document.getElementById("jsonInput");
+  const status = document.getElementById("status");
+
+  fileInput.addEventListener("change", e => {
+    const file = e.target.files[0];
+    const reader = new FileReader();
+    reader.onload = evt => jsonInput.value = evt.target.result;
+    reader.readAsText(file);
+  });
+
+  document.getElementById("validateBtn").onclick = () => {
+    try {
+      JSON.parse(jsonInput.value);
+      status.textContent = "JSON is valid ✔";
+      status.style.color = "green";
+    } catch (err) {
+      status.textContent = "Invalid JSON: " + err.message;
+      status.style.color = "red";
+    }
+  };
+
+  document.getElementById("downloadBtn").onclick = () => {
+    const blob = new Blob([jsonInput.value], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "family.json";
+    a.click();
+  };
+
+  document.getElementById("previewBtn").onclick = () => {
+    try {
+      const data = JSON.parse(jsonInput.value);
+      renderTree(data);
+      status.textContent = "Preview updated ✔";
+      status.style.color = "green";
+    } catch (err) {
+      status.textContent = "Cannot preview: invalid JSON";
+      status.style.color = "red";
+    }
+  };
+
+  function renderTree(data) {
+    const svg = d3.select("#tree");
+    svg.selectAll("*").remove();
+
+    const width = 500;
+    const height = 700;
+
+    const g = svg.append("g")
+      .attr("transform", "translate(250,20)");
+
+    const treeLayout = d3.tree().size([width - 100, height - 100]);
+    const root = d3.hierarchy(data);
+
+    treeLayout(root);
+
+    svg.selectAll(".link")
+      .data(root.links())
+      .enter()
+      .append("path")
+      .attr("class", "link")
+      .attr("d", d3.linkVertical()
+        .x(d => d.x - 200)
+        .y(d => d.y)
+      );
+
+    const node = svg.selectAll(".node")
+      .data(root.descendants())
+      .enter()
+      .append("g")
+      .attr("class", "node")
+      .attr("transform", d => `translate(${d.x - 200},${d.y})`);
+
+    node.append("circle").attr("r", 6);
+    node.append("text")
+      .attr("dy", -10)
+      .attr("text-anchor", "middle")
+      .text(d => d.data.name);
+  }
+</script>
+
+</body>
+</html>

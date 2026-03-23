@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Family Tree Editor (Form-Based)</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      display: flex;
+      height: 100vh;
+      margin: 0;
+    }
+    #treePanel {
+      flex: 1;
+      border-right: 1px solid #ccc;
+      padding: 20px;
+      overflow-y: auto;
+      background: #f7f7f7;
+    }
+    #formPanel {
+      flex: 2;
+      padding: 20px;
+      overflow-y: auto;
+    }
+    h2 { margin-top: 0; }
+    label {
+      display: block;
+      margin-top: 10px;
+      font-weight: bold;
+    }
+    input, textarea {
+      width: 100%;
+      padding: 8px;
+      margin-top: 4px;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+      font-size: 14px;
+    }
+    button {
+      margin-top: 10px;
+      padding: 10px;
+      border: none;
+      background: steelblue;
+      color: white;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    button:hover { background: #1f5f9f; }
+    .node {
+      cursor: pointer;
+      padding: 4px;
+      border-radius: 4px;
+    }
+    .node:hover { background: #e0e0e0; }
+    .selected { background: #cce0ff; }
+  </style>
+</head>
+<body>
+
+<div id="treePanel">
+  <h2>Family Tree</h2>
+  <input type="file" id="fileInput" accept=".json">
+  <div id="tree"></div>
+</div>
+
+<div id="formPanel">
+  <h2>Person Editor</h2>
+
+  <label>Name</label>
+  <input id="nameInput">
+
+  <label>Birth</label>
+  <input id="birthInput">
+
+  <label>Death</label>
+  <input id="deathInput">
+
+  <label>Photo URL</label>
+  <input id="photoInput">
+
+  <label>Bio</label>
+  <textarea id="bioInput" rows="6"></textarea>
+
+  <button id="saveBtn">Save Changes</button>
+  <button id="addChildBtn">Add Child</button>
+  <button id="deleteBtn">Delete Person</button>
+
+  <h3>Export</h3>
+  <button id="downloadBtn">Download JSON</button>
+</div>
+
+<script>
+  let familyData = null;
+  let selectedNode = null;
+
+  const treeDiv = document.getElementById("tree");
+
+  document.getElementById("fileInput").addEventListener("change", e => {
+    const file = e.target.files[0];
+    const reader = new FileReader();
+    reader.onload = evt => {
+      familyData = JSON.parse(evt.target.result);
+      renderTree();
+    };
+    reader.readAsText(file);
+  });
+
+  function renderTree() {
+    treeDiv.innerHTML = "";
+    renderNode(familyData, treeDiv);
+  }
+
+  function renderNode(person, container) {
+    const div = document.createElement("div");
+    div.className = "node";
+    div.textContent = person.name;
+    div.onclick = () => selectPerson(person, div);
+    container.appendChild(div);
+
+    if (person.children) {
+      const childContainer = document.createElement("div");
+      childContainer.style.marginLeft = "20px";
+      container.appendChild(childContainer);
+
+      person.children.forEach(child => renderNode(child, childContainer));
+    }
+  }
+
+  function selectPerson(person, element) {
+    selectedNode = person;
+
+    document.querySelectorAll(".node").forEach(n => n.classList.remove("selected"));
+    element.classList.add("selected");
+
+    document.getElementById("nameInput").value = person.name || "";
+    document.getElementById("birthInput").value = person.birth || "";
+    document.getElementById("deathInput").value = person.death || "";
+    document.getElementById("photoInput").value = person.photo || "";
+    document.getElementById("bioInput").value = person.bio || "";
+  }
+
+  document.getElementById("saveBtn").onclick = () => {
+    if (!selectedNode) return;
+
+    selectedNode.name = document.getElementById("nameInput").value;
+    selectedNode.birth = document.getElementById("birthInput").value;
+    selectedNode.death = document.getElementById("deathInput").value;
+    selectedNode.photo = document.getElementById("photoInput").value;
+    selectedNode.bio = document.getElementById("bioInput").value;
+
+    renderTree();
+  };
+
+  document.getElementById("addChildBtn").onclick = () => {
+    if (!selectedNode) return;
+
+    if (!selectedNode.children) selectedNode.children = [];
+
+    selectedNode.children.push({
+      id: "id_" + Math.random().toString(36).substr(2, 9),
+      name: "New Person",
+      children: []
+    });
+
+    renderTree();
+  };
+
+  document.getElementById("deleteBtn").onclick = () => {
+    if (!selectedNode || selectedNode === familyData) {
+      alert("Cannot delete root person");
+      return;
+    }
+
+    function removePerson(node, target) {
+      if (!node.children) return false;
+
+      const index = node.children.indexOf(target);
+      if (index !== -1) {
+        node.children.splice(index, 1);
+        return true;
+      }
+
+      return node.children.some(child => removePerson(child, target));
+    }
+
+    removePerson(familyData, selectedNode);
+    selectedNode = null;
+    renderTree();
+  };
+
+  document.getElementById("downloadBtn").onclick = () => {
+    const blob = new Blob([JSON.stringify(familyData, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "family.json";
+    a.click();
+  };
+</script>
+
+</body>
+</html>

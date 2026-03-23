@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Family Tree (D3 Enhanced)</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      display: flex;
+      background: #f7f7f7;
+      margin: 0;
+    }
+    #tree-container {
+      flex: 3;
+      padding: 20px;
+    }
+    #info-panel {
+      flex: 1;
+      background: white;
+      padding: 20px;
+      border-left: 1px solid #ccc;
+      min-width: 250px;
+    }
+    #info-panel img {
+      width: 100%;
+      border-radius: 6px;
+      margin-bottom: 10px;
+    }
+    .node circle {
+      fill: #fff;
+      stroke: steelblue;
+      stroke-width: 2px;
+    }
+    .node text {
+      font-size: 14px;
+    }
+    .link {
+      fill: none;
+      stroke: #ccc;
+      stroke-width: 2px;
+    }
+  </style>
+</head>
+<body>
+
+<div id="tree-container">
+  <h1>Family Tree</h1>
+  <svg id="tree" width="1000" height="800"></svg>
+</div>
+
+<div id="info-panel">
+  <h2>Person Details</h2>
+  <p>Select a person to view details</p>
+</div>
+
+<script>
+  const width = 1000;
+  const height = 800;
+
+  const svg = d3.select("#tree")
+    .attr("viewBox", [-width / 2, -50, width, height]);
+
+  const treeLayout = d3.tree().size([width - 200, height - 200]);
+
+  const infoPanel = document.getElementById("info-panel");
+
+  d3.json("family.json").then(data => {
+    const root = d3.hierarchy(data);
+    root.x0 = 0;
+    root.y0 = 0;
+
+    root.children?.forEach(collapse);
+
+    update(root);
+
+    function collapse(d) {
+      if (d.children) {
+        d._children = d.children;
+        d._children.forEach(collapse);
+        d.children = null;
+      }
+    }
+
+    function showInfo(d) {
+      const p = d.data;
+
+      infoPanel.innerHTML = `
+        <h2>${p.name}</h2>
+        ${p.photo ? `<img src="${p.photo}" alt="${p.name}">` : ""}
+        <p><strong>Born:</strong> ${p.birth || "Unknown"}</p>
+        ${p.death ? `<p><strong>Died:</strong> ${p.death}</p>` : ""}
+        ${p.bio ? `<p>${p.bio}</p>` : ""}
+      `;
+    }
+
+    function update(source) {
+      const treeData = treeLayout(root);
+      const nodes = treeData.descendants();
+      const links = treeData.links();
+
+      const node = svg.selectAll("g.node")
+        .data(nodes, d => d.id || (d.id = Math.random()));
+
+      const nodeEnter = node.enter().append("g")
+        .attr("class", "node")
+        .attr("transform", d => `translate(${source.x0},${source.y0})`)
+        .on("click", (event, d) => {
+          d.children = d.children ? null : d._children;
+          update(d);
+          showInfo(d);
+        });
+
+      nodeEnter.append("circle")
+        .attr("r", 1e-6);
+
+      nodeEnter.append("text")
+        .attr("dy", ".35em")
+        .attr("x", 10)
+        .text(d => d.data.name);
+
+      const nodeUpdate = nodeEnter.merge(node);
+
+      nodeUpdate.transition()
+        .duration(300)
+        .attr("transform", d => `translate(${d.x},${d.y})`);
+
+      nodeUpdate.select("circle")
+        .attr("r", 6);
+
+      const nodeExit = node.exit().transition()
+        .duration(300)
+        .attr("transform", d => `translate(${source.x},${source.y})`)
+        .remove();
+
+      nodeExit.select("circle")
+        .attr("r", 1e-6);
+
+      const link = svg.selectAll("path.link")
+        .data(links, d => d.target.id);
+
+      const linkEnter = link.enter().insert("path", "g")
+        .attr("class", "link")
+        .attr("d", d => {
+          const o = { x: source.x0, y: source.y0 };
+          return diagonal(o, o);
+        });
+
+      const linkUpdate = linkEnter.merge(link);
+
+      linkUpdate.transition()
+        .duration(300)
+        .attr("d", d => diagonal(d.source, d.target));
+
+      link.exit().transition()
+        .duration(300)
+        .attr("d", d => {
+          const o = { x: source.x, y: source.y };
+          return diagonal(o, o);
+        })
+        .remove();
+
+      nodes.forEach(d => {
+        d.x0 = d.x;
+        d.y0 = d.y;
+      });
+    }
+
+    function diagonal(s, d) {
+      return `M ${s.x},${s.y}
+              C ${(s.x + d.x) / 2},${s.y}
+                ${(s.x + d.x) / 2},${d.y}
+                ${d.x},${d.y}`;
+    }
+  });
+</script>
+
+</body>
+</html>
